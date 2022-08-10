@@ -10,6 +10,24 @@ const PortBinding = io.type({
   target: io.number,
 })
 
+const PortBindingComposeObject = io.type({
+  published: io.union([io.number, io.string]),
+  target: io.number,
+})
+
+const PortBindingFromComposeObject = new io.Type<io.TypeOf<typeof PortBinding>, io.TypeOf<typeof PortBinding>, unknown>(
+  'PortBindingFromComposeObject',
+  PortBinding.is,
+  (input: unknown, context) =>
+    Either.either.chain(PortBindingComposeObject.validate(input, context), ports =>
+      io.success({
+        ...ports,
+        published: io.string.is(ports.published) ? parseInt(ports.published) : ports.published,
+      }),
+    ),
+  identity,
+)
+
 const PortBindingFromString = new io.Type(
   'PortBindingFromComposeString',
   PortBinding.is,
@@ -29,7 +47,9 @@ const PortBindingFromComposeFile = new io.Type(
   PortBinding.is,
   (input, context) =>
     pipe(
-      io.string.is(input) ? PortBindingFromString.validate(input, context) : PortBinding.validate(input, context),
+      io.string.is(input)
+        ? PortBindingFromString.validate(input, context)
+        : PortBindingFromComposeObject.validate(input, context),
       Either.fold(
         err =>
           io.failure(
